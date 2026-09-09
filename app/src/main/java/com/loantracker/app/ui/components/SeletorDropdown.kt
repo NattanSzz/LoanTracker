@@ -3,6 +3,7 @@ package com.loantracker.app.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
@@ -25,21 +26,36 @@ fun <T> SeletorDropdown(
 ) {
     var expandido by remember { mutableStateOf(false) }
 
-    ExposedDropdownMenuBox(expanded = expandido, onExpandedChange = { expandido = it }) {
+    ExposedDropdownMenuBox(
+        expanded = expandido,
+        onExpandedChange = { expandido = it }
+    ) {
         OutlinedTextField(
             value = selecionado?.let(textoDe) ?: "",
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandido) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(
+                    expanded = expandido
+                )
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor()
         )
-        androidx.compose.material3.ExposedDropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
+
+        ExposedDropdownMenu(
+            expanded = expandido,
+            onDismissRequest = {
+                expandido = false
+            }
+        ) {
             opcoes.forEach { opcao ->
                 DropdownMenuItem(
-                    text = { Text(textoDe(opcao)) },
+                    text = {
+                        Text(textoDe(opcao))
+                    },
                     onClick = {
                         onSelecionar(opcao)
                         expandido = false
