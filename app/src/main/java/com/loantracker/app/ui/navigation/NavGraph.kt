@@ -26,6 +26,7 @@ import com.loantracker.app.ui.home.HomeScreen
 import com.loantracker.app.ui.info.InfoScreen
 import com.loantracker.app.ui.pagamento.RegistrarPagamentoScreen
 import com.loantracker.app.ui.perfil.PerfilClienteScreen
+import androidx.compose.foundation.layout.padding
 
 object Routes {
     const val HOME = "home"
