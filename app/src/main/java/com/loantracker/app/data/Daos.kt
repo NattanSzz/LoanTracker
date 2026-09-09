@@ -12,11 +12,17 @@ interface ClienteDao {
     @Insert
     suspend fun inserir(cliente: Cliente): Long
 
+    @Insert
+    suspend fun inserirTodos(clientes: List<Cliente>)
+
     @Update
     suspend fun atualizar(cliente: Cliente)
 
     @Delete
     suspend fun excluir(cliente: Cliente)
+
+    @Query("DELETE FROM clientes")
+    suspend fun excluirTodos()
 
     @Query("SELECT * FROM clientes ORDER BY nome ASC")
     fun observarTodos(): Flow<List<Cliente>>
@@ -32,6 +38,9 @@ interface ClienteDao {
 interface EmprestimoDao {
     @Insert
     suspend fun inserir(emprestimo: Emprestimo): Long
+
+    @Insert
+    suspend fun inserirTodos(emprestimos: List<Emprestimo>)
 
     @Query("SELECT * FROM emprestimos WHERE clienteId = :clienteId ORDER BY dataEmprestimo DESC")
     fun observarPorCliente(clienteId: Long): Flow<List<Emprestimo>>
@@ -78,6 +87,9 @@ interface ParcelaDao {
 interface PagamentoDao {
     @Insert
     suspend fun inserir(pagamento: Pagamento): Long
+
+    @Insert
+    suspend fun inserirTodos(pagamentos: List<Pagamento>)
 
     @Query("SELECT * FROM pagamentos WHERE parcelaId = :parcelaId ORDER BY dataPagamento DESC")
     fun observarPorParcela(parcelaId: Long): Flow<List<Pagamento>>

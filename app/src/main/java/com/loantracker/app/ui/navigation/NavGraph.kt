@@ -10,6 +10,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -51,12 +52,33 @@ private val abas = listOf(
 )
 
 @Composable
-fun LoanTrackerNavGraph() {
+fun LoanTrackerNavGraph(
+    deepLink: DeepLinkTarget? = null,
+    onDeepLinkConsumido: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val rotaAtual = backStackEntry?.destination
 
     val mostrarBottomBar = abas.any { it.rota == rotaAtual?.route }
+
+    LaunchedEffect(deepLink) {
+        when (deepLink) {
+            is DeepLinkTarget.AbrirCliente -> {
+                navController.navigate(Routes.perfilCliente(deepLink.clienteId)) {
+                    launchSingleTop = true
+                }
+                onDeepLinkConsumido()
+            }
+            DeepLinkTarget.AbrirInfo -> {
+                navController.navigate(Routes.INFO) {
+                    launchSingleTop = true
+                }
+                onDeepLinkConsumido()
+            }
+            null -> Unit
+        }
+    }
 
     Scaffold(
         bottomBar = {

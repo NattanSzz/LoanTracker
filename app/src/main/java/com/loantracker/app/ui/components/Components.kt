@@ -28,9 +28,9 @@ private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM")
 
 fun SituacaoCliente.label(): String = when (this) {
     SituacaoCliente.EM_DIA -> "Em dia"
-    SituacaoCliente.VENCE_HOJE -> "Vence hoje"
-    SituacaoCliente.VENCE_AMANHA -> "Vence amanhã"
-    SituacaoCliente.EM_ATRASO -> "Em atraso"
+    SituacaoCliente.VENCE_HOJE -> "🟡 Vence hoje"
+    SituacaoCliente.VENCE_AMANHA -> "🟠 Vence amanhã"
+    SituacaoCliente.EM_ATRASO -> "🔴 Em atraso"
 }
 
 fun SituacaoCliente.cor(): Color = when (this) {
@@ -65,7 +65,7 @@ fun ClienteCard(resumo: ClienteResumo, onClick: () -> Unit) {
             )
             if (resumo.parcelasVencidas > 0) {
                 Text(
-                    text = "${resumo.parcelasVencidas} parcela(s) em atraso",
+                    text = "🔴 ${resumo.parcelasVencidas} parcela(s) em atraso",
                     color = AlertRed,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.bodyMedium
