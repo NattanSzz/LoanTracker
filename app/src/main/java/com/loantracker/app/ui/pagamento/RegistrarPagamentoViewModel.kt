@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loantracker.app.data.Cents
 import com.loantracker.app.data.Cliente
+import com.loantracker.app.data.GrupoParcelasPendentes
 import com.loantracker.app.data.LoanRepository
-import com.loantracker.app.data.Parcela
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,9 +32,10 @@ class RegistrarPagamentoViewModel(private val repository: LoanRepository) : View
             clientes.firstOrNull { it.id == id }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val parcelasPendentes: StateFlow<List<Parcela>> =
+    /** Parcelas pendentes do cliente selecionado, já organizadas por empréstimo. */
+    val gruposPendentes: StateFlow<List<GrupoParcelasPendentes>> =
         clienteSelecionadoId.flatMapLatest { id ->
-            if (id == null) flowOf(emptyList()) else repository.observarParcelasPendentesDoCliente(id)
+            if (id == null) flowOf(emptyList()) else repository.observarParcelasPendentesAgrupadas(id)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun atualizarBusca(texto: String) {
