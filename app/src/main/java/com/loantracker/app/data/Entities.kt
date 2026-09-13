@@ -6,7 +6,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.LocalDate
 
-enum class TipoJuros { SIMPLES, COMPOSTO }
+enum class TipoJuros { SIMPLES, COMPOSTO, ALUGUEL }
 
 enum class FrequenciaParcela { DIARIA, SEMANAL, QUINZENAL, MENSAL }
 
@@ -41,7 +41,7 @@ data class Emprestimo(
     val valorEmprestadoCents: Cents,
     val taxaJurosPercentual: Double, // ex: 10.0 representa 10%
     val tipoJuros: TipoJuros,
-    val quantidadeParcelas: Int,
+    val quantidadeParcelas: Int, // 0 para empréstimos do tipo ALUGUEL (sem número fixo)
     val frequencia: FrequenciaParcela,
     val dataEmprestimo: LocalDate,
     val primeiroVencimento: LocalDate,
@@ -49,7 +49,12 @@ data class Emprestimo(
     // empréstimos futuros usem taxas diferentes
     val totalJurosCents: Cents,
     val totalAReceberCents: Cents,
-    val valorParcelaCents: Cents
+    val valorParcelaCents: Cents,
+    // adicionados depois da v1: default garante compatibilidade com dados e
+    // backups já existentes que não tinham esses campos
+    val descontoPorParcelaCents: Cents = 0,
+    val titulo: String = "",
+    val quitadoManualmente: Boolean = false
 )
 
 @Entity(
