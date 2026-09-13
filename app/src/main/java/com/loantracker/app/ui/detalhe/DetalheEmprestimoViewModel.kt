@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class DetalheEmprestimoUi(
     val emprestimo: Emprestimo? = null,
@@ -23,7 +24,10 @@ data class DetalheEmprestimoUi(
     val ultimoVencimento get() = parcelas.maxByOrNull { it.numero }?.vencimento
 }
 
-class DetalheEmprestimoViewModel(repository: LoanRepository, emprestimoId: Long) : ViewModel() {
+class DetalheEmprestimoViewModel(
+    private val repository: LoanRepository,
+    private val emprestimoId: Long
+) : ViewModel() {
 
     val estado: StateFlow<DetalheEmprestimoUi> = repository.observarEmprestimo(emprestimoId)
         .flatMapLatest { emprestimo ->
@@ -43,4 +47,11 @@ class DetalheEmprestimoViewModel(repository: LoanRepository, emprestimoId: Long)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DetalheEmprestimoUi())
+
+    /** Só vale para empréstimos do tipo Aluguel: marca tudo como pago e para de gerar novas parcelas. */
+    fun quitarEmprestimo() {
+        viewModelScope.launch {
+            repository.quitarEmprestimoAluguel(emprestimoId)
+        }
+    }
 }
