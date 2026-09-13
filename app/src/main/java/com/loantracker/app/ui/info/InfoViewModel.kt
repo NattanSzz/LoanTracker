@@ -20,13 +20,13 @@ class InfoViewModel(private val repository: LoanRepository) : ViewModel() {
     private val _mensagemBackup = MutableStateFlow<String?>(null)
     val mensagemBackup: StateFlow<String?> = _mensagemBackup
 
-    fun exportarBackup(context: Context, uri: Uri) {
+    fun escolherDestinoEExportar(context: Context, uri: Uri) {
         viewModelScope.launch {
             try {
-                BackupManager.exportar(context, repository, uri)
-                _mensagemBackup.value = "Backup exportado com sucesso."
+                BackupManager.escolherDestinoEExportar(context, repository, uri)
+                _mensagemBackup.value = "Pasta de backup configurada. O app vai manter esse arquivo atualizado automaticamente todo dia."
             } catch (e: Exception) {
-                _mensagemBackup.value = "Erro ao exportar backup: ${e.message}"
+                _mensagemBackup.value = "Erro ao configurar pasta de backup: ${e.message}"
             }
         }
     }
