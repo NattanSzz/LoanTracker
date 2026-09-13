@@ -42,6 +42,9 @@ interface EmprestimoDao {
     @Insert
     suspend fun inserirTodos(emprestimos: List<Emprestimo>)
 
+    @Update
+    suspend fun atualizar(emprestimo: Emprestimo)
+
     @Query("SELECT * FROM emprestimos WHERE clienteId = :clienteId ORDER BY dataEmprestimo DESC")
     fun observarPorCliente(clienteId: Long): Flow<List<Emprestimo>>
 
@@ -58,6 +61,9 @@ interface EmprestimoDao {
 @Dao
 interface ParcelaDao {
     @Insert
+    suspend fun inserir(parcela: Parcela): Long
+
+    @Insert
     suspend fun inserirTodas(parcelas: List<Parcela>)
 
     @Update
@@ -66,11 +72,18 @@ interface ParcelaDao {
     @Query("SELECT * FROM parcelas WHERE emprestimoId = :emprestimoId ORDER BY numero ASC")
     fun observarPorEmprestimo(emprestimoId: Long): Flow<List<Parcela>>
 
+    /**
+     * Parcelas pendentes para a tela de Registrar pagamento. Empréstimos do
+     * tipo ALUGUEL ficam de fora — eles se pagam sozinhos automaticamente,
+     * não passam por registro manual de pagamento.
+     */
     @Query(
         """
         SELECT parcelas.* FROM parcelas
         INNER JOIN emprestimos ON parcelas.emprestimoId = emprestimos.id
-        WHERE emprestimos.clienteId = :clienteId AND parcelas.valorPagoCents < parcelas.valorCents
+        WHERE emprestimos.clienteId = :clienteId
+          AND parcelas.valorPagoCents < parcelas.valorCents
+          AND emprestimos.tipoJuros != 'ALUGUEL'
         ORDER BY parcelas.vencimento ASC
         """
     )
