@@ -1,6 +1,7 @@
 package com.loantracker.app.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -22,20 +23,34 @@ import java.time.format.DateTimeFormatter
 
 private val displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
+/**
+ * Campo de data somente leitura que abre o seletor ao ser tocado.
+ *
+ * IMPORTANTE: um OutlinedTextField com readOnly=true ainda intercepta o
+ * toque para posicionar o cursor, então um `.clickable` direto nele não
+ * é acionado de forma confiável. A correção é sobrepor uma camada
+ * transparente e clicável por cima do campo (Box), que captura o toque
+ * antes que ele chegue ao campo de texto.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateField(label: String, data: LocalDate, onDataSelecionada: (LocalDate) -> Unit) {
     var mostrarDialog by remember { mutableStateOf(false) }
 
-    OutlinedTextField(
-        value = data.format(displayFormatter),
-        onValueChange = {},
-        label = { Text(label) },
-        readOnly = true,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { mostrarDialog = true }
-    )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = data.format(displayFormatter),
+            onValueChange = {},
+            label = { Text(label) },
+            readOnly = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable { mostrarDialog = true }
+        )
+    }
 
     if (mostrarDialog) {
         val state = rememberDatePickerState(
