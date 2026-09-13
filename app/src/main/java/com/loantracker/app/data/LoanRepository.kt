@@ -1,6 +1,7 @@
 package com.loantracker.app.data
 
 import androidx.room.withTransaction
+import com.loantracker.app.domain.InstallmentGenerator
 import com.loantracker.app.domain.InterestCalculator
 import com.loantracker.app.domain.diasEmAtraso
 import com.loantracker.app.domain.restanteCents
@@ -71,6 +72,13 @@ data class DadosNotificacao(
     val vencidas: List<ParcelaParaNotificar>
 )
 
+/** Parcelas pendentes de um cliente, agrupadas pelo empréstimo a que pertencem. */
+data class GrupoParcelasPendentes(
+    val emprestimoId: Long,
+    val titulo: String,
+    val parcelas: List<Parcela>
+)
+
 class LoanRepository(
     private val db: AppDatabase,
     private val clienteDao: ClienteDao,
@@ -81,6 +89,8 @@ class LoanRepository(
     fun observarClientes(): Flow<List<Cliente>> = clienteDao.observarTodos()
 
     suspend fun cadastrarCliente(cliente: Cliente): Long = clienteDao.inserir(cliente)
+
+    suspend fun atualizarCliente(cliente: Cliente) = clienteDao.atualizar(cliente)
 
     suspend fun buscarCliente(id: Long): Cliente? = clienteDao.buscarPorId(id)
 
@@ -97,13 +107,34 @@ class LoanRepository(
     fun observarParcelasPendentesDoCliente(clienteId: Long): Flow<List<Parcela>> =
         parcelaDao.observarPendentesPorCliente(clienteId)
 
-    /** Cadastra um novo empréstimo já calculando e criando todas as parcelas. */
+    /** Parcelas pendentes de um cliente, para a tela de Registrar pagamento, agrupadas por empréstimo. */
+    fun observarParcelasPendentesAgrupadas(clienteId: Long): Flow<List<GrupoParcelasPendentes>> =
+        combine(
+            emprestimoDao.observarPorCliente(clienteId),
+            parcelaDao.observarPendentesPorCliente(clienteId)
+        ) { emprestimos, parcelas ->
+            emprestimos.sortedBy { it.id }.mapNotNull { emprestimo ->
+                val parcelasDoEmprestimo = parcelas.filter { it.emprestimoId == emprestimo.id }.sortedBy { it.numero }
+                if (parcelasDoEmprestimo.isEmpty()) {
+                    null
+                } else {
+                    GrupoParcelasPendentes(
+                        emprestimoId = emprestimo.id,
+                        titulo = emprestimo.titulo.ifBlank { "Empréstimo" },
+                        parcelas = parcelasDoEmprestimo
+                    )
+                }
+            }
+        }
+
+    /** Cadastra um novo empréstimo já calculando e criando a(s) parcela(s) iniciais. */
     suspend fun cadastrarEmprestimo(
         clienteId: Long,
         valorEmprestadoCents: Cents,
         taxaPercentual: Double,
         tipo: TipoJuros,
         quantidadeParcelas: Int,
+        descontoPorParcelaCents: Cents,
         frequencia: FrequenciaParcela,
         dataEmprestimo: LocalDate,
         primeiroVencimento: LocalDate
@@ -113,24 +144,30 @@ class LoanRepository(
             taxaPercentual = taxaPercentual,
             tipo = tipo,
             quantidadeParcelas = quantidadeParcelas,
+            descontoPorParcelaCents = descontoPorParcelaCents,
             dataEmprestimo = dataEmprestimo,
             primeiroVencimento = primeiroVencimento,
             frequencia = frequencia
         )
-        val valoresParcelas = InterestCalculator.distribuirIgualmente(resumo.totalAReceberCents, quantidadeParcelas)
+
+        val quantidadeExistente = emprestimoDao.observarPorCliente(clienteId).first().size
+        val titulo = "Empréstimo #${quantidadeExistente + 1}"
 
         val emprestimo = Emprestimo(
             clienteId = clienteId,
             valorEmprestadoCents = valorEmprestadoCents,
             taxaJurosPercentual = taxaPercentual,
             tipoJuros = tipo,
-            quantidadeParcelas = quantidadeParcelas,
+            quantidadeParcelas = if (tipo == TipoJuros.ALUGUEL) 0 else quantidadeParcelas,
             frequencia = frequencia,
             dataEmprestimo = dataEmprestimo,
             primeiroVencimento = primeiroVencimento,
             totalJurosCents = resumo.totalJurosCents,
             totalAReceberCents = resumo.totalAReceberCents,
-            valorParcelaCents = resumo.valorParcelaCents
+            valorParcelaCents = resumo.valorParcelaCents,
+            descontoPorParcelaCents = descontoPorParcelaCents,
+            titulo = titulo,
+            quitadoManualmente = false
         )
         val emprestimoId = emprestimoDao.inserir(emprestimo)
 
@@ -139,7 +176,7 @@ class LoanRepository(
                 emprestimoId = emprestimoId,
                 numero = index + 1,
                 vencimento = data,
-                valorCents = valoresParcelas[index]
+                valorCents = resumo.valoresParcelas[index]
             )
         }
         parcelaDao.inserirTodas(parcelas)
@@ -152,6 +189,68 @@ class LoanRepository(
         pagamentoDao.inserir(Pagamento(parcelaId = parcelaId, valorPagoCents = valorPagoCents, dataPagamento = data))
         val novoValorPago = (parcela.valorPagoCents + valorPagoCents).coerceAtMost(parcela.valorCents)
         parcelaDao.atualizar(parcela.copy(valorPagoCents = novoValorPago))
+    }
+
+    /**
+     * Processa empréstimos do tipo Aluguel: quando o dia de vencimento da
+     * parcela atual já passou (ou seja, aquele dia já terminou), marca a
+     * parcela como paga automaticamente e gera a próxima parcela, seguindo a
+     * frequência do empréstimo. Roda em loop pra "recuperar o atraso" caso o
+     * app tenha ficado fechado por mais de um período.
+     */
+    suspend fun processarEmprestimosAluguel() {
+        val hoje = LocalDate.now()
+        val emprestimos = emprestimoDao.observarTodos().first()
+            .filter { it.tipoJuros == TipoJuros.ALUGUEL && !it.quitadoManualmente }
+        if (emprestimos.isEmpty()) return
+
+        val todasParcelas = parcelaDao.observarTodas().first()
+
+        for (emprestimo in emprestimos) {
+            var ultimaParcela = todasParcelas
+                .filter { it.emprestimoId == emprestimo.id }
+                .maxByOrNull { it.numero } ?: continue
+
+            var seguranca = 0
+            while (ultimaParcela.vencimento.isBefore(hoje) && seguranca < 1000) {
+                seguranca++
+                if (ultimaParcela.valorPagoCents < ultimaParcela.valorCents) {
+                    val faltante = ultimaParcela.valorCents - ultimaParcela.valorPagoCents
+                    pagamentoDao.inserir(
+                        Pagamento(parcelaId = ultimaParcela.id, valorPagoCents = faltante, dataPagamento = ultimaParcela.vencimento)
+                    )
+                    parcelaDao.atualizar(ultimaParcela.copy(valorPagoCents = ultimaParcela.valorCents))
+                }
+
+                val proximaData = InstallmentGenerator.proximaData(ultimaParcela.vencimento, emprestimo.frequencia)
+                val novaParcela = Parcela(
+                    emprestimoId = emprestimo.id,
+                    numero = ultimaParcela.numero + 1,
+                    vencimento = proximaData,
+                    valorCents = emprestimo.valorParcelaCents
+                )
+                val novoId = parcelaDao.inserir(novaParcela)
+                ultimaParcela = novaParcela.copy(id = novoId)
+            }
+        }
+    }
+
+    /**
+     * Encerra manualmente um empréstimo do tipo Aluguel: marca a parcela
+     * aberta como paga e impede que novas parcelas sejam geradas depois.
+     */
+    suspend fun quitarEmprestimoAluguel(emprestimoId: Long) {
+        val emprestimo = emprestimoDao.buscarPorId(emprestimoId) ?: return
+        emprestimoDao.atualizar(emprestimo.copy(quitadoManualmente = true))
+
+        val parcelas = parcelaDao.observarPorEmprestimo(emprestimoId).first()
+        parcelas.filter { it.valorPagoCents < it.valorCents }.forEach { parcela ->
+            val faltante = parcela.valorCents - parcela.valorPagoCents
+            pagamentoDao.inserir(
+                Pagamento(parcelaId = parcela.id, valorPagoCents = faltante, dataPagamento = LocalDate.now())
+            )
+            parcelaDao.atualizar(parcela.copy(valorPagoCents = parcela.valorCents))
+        }
     }
 
     fun observarResumosClientes(): Flow<List<ClienteResumo>> =
@@ -207,7 +306,7 @@ class LoanRepository(
                     emprestimo = emprestimo,
                     totalPagoCents = totalPago,
                     totalRestanteCents = totalRestante,
-                    quitado = totalRestante <= 0,
+                    quitado = if (emprestimo.tipoJuros == TipoJuros.ALUGUEL) emprestimo.quitadoManualmente else totalRestante <= 0,
                     parcelasEmAtraso = parcelas.count { it.situacao(hoje) == SituacaoParcela.VENCIDA }
                 )
             }
@@ -313,7 +412,7 @@ class LoanRepository(
         )
     }
 
-    /** Gera um snapshot em JSON de todos os dados locais, para backup manual. */
+    /** Gera um snapshot em JSON de todos os dados locais, para backup manual ou automático. */
     suspend fun exportarParaJson(): String {
         val clientes = clienteDao.observarTodos().first()
         val emprestimos = emprestimoDao.observarTodos().first()
@@ -321,7 +420,7 @@ class LoanRepository(
         val pagamentos = pagamentoDao.observarTodos().first()
 
         val raiz = JSONObject()
-        raiz.put("versao", 1)
+        raiz.put("versao", 2)
         raiz.put("exportadoEm", LocalDate.now().toString())
 
         raiz.put("clientes", JSONArray().apply {
@@ -353,6 +452,10 @@ class LoanRepository(
                     put("totalJurosCents", e.totalJurosCents)
                     put("totalAReceberCents", e.totalAReceberCents)
                     put("valorParcelaCents", e.valorParcelaCents)
+                    // campos novos a partir da versão 2 — backups antigos não os têm
+                    put("descontoPorParcelaCents", e.descontoPorParcelaCents)
+                    put("titulo", e.titulo)
+                    put("quitadoManualmente", e.quitadoManualmente)
                 })
             }
         })
@@ -388,6 +491,10 @@ class LoanRepository(
      * Restaura um backup gerado por [exportarParaJson], substituindo todos os
      * dados locais atuais. Os IDs originais são preservados para manter os
      * relacionamentos entre clientes, empréstimos, parcelas e pagamentos.
+     *
+     * Compatível com backups gerados por versões anteriores do app: campos
+     * que não existiam ainda (desconto, título, quitação manual) são lidos
+     * com valores padrão (0 / "" / false) quando ausentes, sem gerar erro.
      */
     suspend fun importarDeJson(json: String) {
         val raiz = JSONObject(json)
@@ -417,7 +524,10 @@ class LoanRepository(
                 primeiroVencimento = LocalDate.ofEpochDay(o.getLong("primeiroVencimento")),
                 totalJurosCents = o.getLong("totalJurosCents"),
                 totalAReceberCents = o.getLong("totalAReceberCents"),
-                valorParcelaCents = o.getLong("valorParcelaCents")
+                valorParcelaCents = o.getLong("valorParcelaCents"),
+                descontoPorParcelaCents = o.optLong("descontoPorParcelaCents", 0L),
+                titulo = if (o.has("titulo")) o.optString("titulo", "") else "",
+                quitadoManualmente = o.optBoolean("quitadoManualmente", false)
             )
         }
 
