@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.loantracker.app.ui.cliente.CadastroClienteScreen
+import com.loantracker.app.ui.cliente.EditarClienteScreen
 import com.loantracker.app.ui.detalhe.DetalheEmprestimoScreen
 import com.loantracker.app.ui.emprestimo.CadastroEmprestimoScreen
 import com.loantracker.app.ui.home.HomeScreen
@@ -38,11 +39,13 @@ object Routes {
     const val CADASTRO_EMPRESTIMO = "cadastro_emprestimo"
     const val REGISTRAR_PAGAMENTO = "registrar_pagamento"
     const val PERFIL_CLIENTE = "perfil_cliente/{clienteId}"
+    const val EDITAR_CLIENTE = "editar_cliente/{clienteId}"
     const val DETALHE_EMPRESTIMO = "detalhe_emprestimo/{emprestimoId}"
     const val CONFIGURACOES = "configuracoes"
     const val DEFINIR_SENHA = "definir_senha"
 
     fun perfilCliente(id: Long) = "perfil_cliente/$id"
+    fun editarCliente(id: Long) = "editar_cliente/$id"
     fun detalheEmprestimo(id: Long) = "detalhe_emprestimo/$id"
     fun cadastroEmprestimo(clienteId: Long? = null) =
         if (clienteId != null) "$CADASTRO_EMPRESTIMO?clienteId=$clienteId" else CADASTRO_EMPRESTIMO
@@ -160,8 +163,20 @@ fun LoanTrackerNavGraph(
                 PerfilClienteScreen(
                     clienteId = clienteId,
                     onVoltar = { navController.popBackStack() },
+                    onEditarCliente = { id -> navController.navigate(Routes.editarCliente(id)) },
                     onNovoEmprestimo = { id -> navController.navigate(Routes.cadastroEmprestimo(id)) },
                     onAbrirEmprestimo = { id -> navController.navigate(Routes.detalheEmprestimo(id)) }
+                )
+            }
+            composable(
+                route = Routes.EDITAR_CLIENTE,
+                arguments = listOf(navArgument("clienteId") { type = NavType.LongType })
+            ) { entry ->
+                val clienteId = entry.arguments?.getLong("clienteId") ?: return@composable
+                EditarClienteScreen(
+                    clienteId = clienteId,
+                    onVoltar = { navController.popBackStack() },
+                    onClienteSalvo = { navController.popBackStack() }
                 )
             }
             composable(
