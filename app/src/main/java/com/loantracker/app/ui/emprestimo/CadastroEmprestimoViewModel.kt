@@ -22,12 +22,15 @@ data class NovoEmprestimoState(
     val taxaPercentual: Double = 0.0,
     val tipoJuros: TipoJuros = TipoJuros.SIMPLES,
     val quantidadeParcelas: Int = 1,
+    val descontoPorParcelaCents: Cents = 0,
     val frequencia: FrequenciaParcela = FrequenciaParcela.MENSAL,
     val dataEmprestimo: LocalDate = LocalDate.now(),
     val primeiroVencimento: LocalDate = LocalDate.now().plusMonths(1)
 ) {
     val pronto: Boolean
-        get() = clienteId != null && valorEmprestadoCents > 0 && quantidadeParcelas > 0
+        get() = clienteId != null &&
+            valorEmprestadoCents > 0 &&
+            (tipoJuros == TipoJuros.ALUGUEL || quantidadeParcelas > 0)
 }
 
 class CadastroEmprestimoViewModel(private val repository: LoanRepository) : ViewModel() {
@@ -50,6 +53,7 @@ class CadastroEmprestimoViewModel(private val repository: LoanRepository) : View
             taxaPercentual = estado.taxaPercentual,
             tipo = estado.tipoJuros,
             quantidadeParcelas = estado.quantidadeParcelas,
+            descontoPorParcelaCents = estado.descontoPorParcelaCents,
             dataEmprestimo = estado.dataEmprestimo,
             primeiroVencimento = estado.primeiroVencimento,
             frequencia = estado.frequencia
@@ -66,6 +70,7 @@ class CadastroEmprestimoViewModel(private val repository: LoanRepository) : View
                 taxaPercentual = estado.taxaPercentual,
                 tipo = estado.tipoJuros,
                 quantidadeParcelas = estado.quantidadeParcelas,
+                descontoPorParcelaCents = estado.descontoPorParcelaCents,
                 frequencia = estado.frequencia,
                 dataEmprestimo = estado.dataEmprestimo,
                 primeiroVencimento = estado.primeiroVencimento
