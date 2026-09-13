@@ -34,12 +34,14 @@ precisar do Android Studio). Configure a variável `ANDROID_HOME` e um arquivo
 
 O APK fica em `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Decisões de cálculo (assumidas, pois o documento de escopo não detalhou a fórmula)
+## Decisões de cálculo
 
-- A taxa de juros informada é aplicada **uma vez por parcela** (ex.: "10% ao
-  mês" com 5 parcelas mensais = 5 períodos de incidência).
-- **Juros simples:** `total = principal + (principal × taxa × parcelas)`.
-- **Juros compostos:** `total = principal × (1 + taxa)^parcelas`.
+- **Juros simples** (fórmula usada pelo usuário no controle manual): a taxa
+  incide **uma única vez** sobre o valor emprestado, e o total é dividido
+  igualmente pelas parcelas — `valorParcela = (principal + principal × taxa) ÷ parcelas`.
+  Ex.: R$ 1.000,00 a 20% em 4 parcelas → (1000 + 200) ÷ 4 = R$ 300,00 cada.
+- **Juros compostos** (não pedido, mantido como alternativa no formulário):
+  `total = principal × (1 + taxa)^parcelas`.
 - O valor de cada parcela é `total ÷ quantidade de parcelas`, com eventual
   diferença de arredondamento (poucos centavos) ajustada na última parcela,
   para que a soma das parcelas bata exatamente com o total a receber.
@@ -49,6 +51,17 @@ O APK fica em `app/build/outputs/apk/debug/app-debug.apk`.
 Esses pontos podem ser ajustados facilmente em
 `app/src/main/java/com/loantracker/app/domain/Calculations.kt` caso a forma
 de cálculo desejada seja diferente.
+
+## Senha de acesso (novo)
+
+O app pode ser protegido por uma senha numérica (sem limite de dígitos).
+Em **Início → ⚙ Configurações** há a opção "Adicionar senha" (ou "Alterar
+senha", se já existir uma). A senha nunca é salva em texto puro — só um hash
+SHA-256 com salt fica no armazenamento local do próprio app. Enquanto não há
+senha cadastrada, o app abre normalmente; a partir do momento em que uma é
+definida, toda vez que o app for aberto do zero (processo novo) aparece um
+teclado numérico que desbloqueia sozinho assim que a sequência digitada bate
+com a senha salva — sem precisar de um botão de confirmar.
 
 ## Estrutura do projeto
 
