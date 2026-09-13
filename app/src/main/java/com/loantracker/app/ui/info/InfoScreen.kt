@@ -35,13 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.loantracker.app.data.BackupManager
 import com.loantracker.app.data.toBRL
 import com.loantracker.app.ui.components.InfoStatCard
 import com.loantracker.app.ui.rememberViewModel
 import com.loantracker.app.ui.theme.AlertRed
 import com.loantracker.app.ui.theme.PrimaryGreen
 import com.loantracker.app.ui.theme.WarningOrange
-import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,8 +56,8 @@ fun InfoScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
 
     val exportarLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> uri?.let { viewModel.exportarBackup(context, it) } }
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri -> uri?.let { viewModel.escolherDestinoEExportar(context, it) } }
 
     val importarLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -173,16 +173,24 @@ fun InfoScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Backup", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "Salve uma cópia dos seus dados (clientes, empréstimos, parcelas e pagamentos) onde quiser: Google Drive, Downloads, pendrive, etc.",
+                        "Escolha uma pasta (Google Drive, Downloads, pendrive, etc.) onde o app vai guardar " +
+                            "seus dados (clientes, empréstimos, parcelas e pagamentos). A partir daí, o backup " +
+                            "é atualizado sozinho todo dia, sempre no mesmo arquivo.",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    val temPastaConfigurada = remember(mensagemBackup) { BackupManager.obterPastaDestino(context) != null }
+                    if (temPastaConfigurada) {
+                        Text(
+                            "Pasta de backup automático já configurada.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = PrimaryGreen
+                        )
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = {
-                                exportarLauncher.launch("controle_emprestimos_backup_${LocalDate.now()}.json")
-                            },
+                            onClick = { exportarLauncher.launch(null) },
                             modifier = Modifier.weight(1f)
-                        ) { Text("Exportar") }
+                        ) { Text(if (temPastaConfigurada) "Trocar destino" else "Escolher destino") }
                         OutlinedButton(
                             onClick = { mostrarConfirmacaoRestaurar = true },
                             modifier = Modifier.weight(1f)
