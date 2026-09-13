@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.loantracker.app.data.TipoJuros
 import com.loantracker.app.data.toBRL
 import com.loantracker.app.ui.rememberViewModel
 
@@ -36,6 +38,7 @@ import com.loantracker.app.ui.rememberViewModel
 fun PerfilClienteScreen(
     clienteId: Long,
     onVoltar: () -> Unit,
+    onEditarCliente: (Long) -> Unit,
     onNovoEmprestimo: (Long) -> Unit,
     onAbrirEmprestimo: (Long) -> Unit
 ) {
@@ -50,6 +53,11 @@ fun PerfilClienteScreen(
                 navigationIcon = {
                     IconButton(onClick = onVoltar) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Voltar")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { onEditarCliente(clienteId) }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Editar cliente")
                     }
                 }
             )
@@ -98,15 +106,30 @@ fun PerfilClienteScreen(
             }
 
             items(estado.emprestimos, key = { it.emprestimo.id }) { resumo ->
+                val ehAluguel = resumo.emprestimo.tipoJuros == TipoJuros.ALUGUEL
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { onAbrirEmprestimo(resumo.emprestimo.id) },
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            resumo.emprestimo.titulo.ifBlank { "Empréstimo" },
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
                         LinhaValor("Emprestado", resumo.emprestimo.valorEmprestadoCents.toBRL())
-                        LinhaValor("Total a receber", resumo.emprestimo.totalAReceberCents.toBRL())
+                        if (!ehAluguel) {
+                            LinhaValor("Total a receber", resumo.emprestimo.totalAReceberCents.toBRL())
+                        } else {
+                            LinhaValor("Aluguel por período", resumo.emprestimo.valorParcelaCents.toBRL())
+                        }
+                        if (resumo.emprestimo.descontoPorParcelaCents > 0) {
+                            LinhaValor("Desconto", "- ${resumo.emprestimo.descontoPorParcelaCents.toBRL()}")
+                        }
                         LinhaValor("Recebido", resumo.totalPagoCents.toBRL())
-                        LinhaValor("Restante", resumo.totalRestanteCents.toBRL())
+                        if (!ehAluguel) {
+                            LinhaValor("Restante", resumo.totalRestanteCents.toBRL())
+                        }
                         Text(
                             text = when {
                                 resumo.quitado -> "Quitado"
