@@ -13,58 +13,79 @@ import java.time.temporal.ChronoUnit
 
 /**
  * Resultado do cálculo de um empréstimo antes de ser salvo, usado para exibir
- * o resumo de conferência para o usuário.
+ * o resumo de conferência para o usuário e para gerar as parcelas reais.
  */
 data class ResumoEmprestimo(
     val valorEmprestadoCents: Cents,
     val totalJurosCents: Cents,
     val totalAReceberCents: Cents,
     val valorParcelaCents: Cents,
+    val valoresParcelas: List<Cents>,
     val datasParcelas: List<LocalDate>
 )
 
 object InterestCalculator {
 
     /**
-     * Juros simples (a pedido do usuário — juros incide uma única vez sobre o
-     * principal, não por parcela):
-     *   totalJuros = principal * taxa
-     *   totalAReceber = principal + totalJuros
-     *   valorParcela = totalAReceber / quantidadeParcelas
-     * Ex.: R$ 1.000,00 a 20% em 4 parcelas → (1000 + 200) / 4 = R$ 300,00.
+     * Juros simples (fórmula do usuário — juros incide uma única vez sobre o
+     * principal, depois divide igualmente pelas parcelas, subtraindo o
+     * desconto por parcela de cada uma):
+     *   valorParcela = ((principal + principal*taxa) / quantidadeParcelas) - desconto
+     * Ex.: R$ 1.000,00 a 20% em 4 parcelas, sem desconto → (1000 + 200) / 4 = R$ 300,00.
      *
-     * Juros composto (inalterado): totalAReceber = principal * (1 + taxa)^quantidadeParcelas
+     * Aluguel: o cliente só paga os juros periodicamente, sem prazo fixo pra
+     * quitar o principal — cada "parcela" é o próprio valor do juros do
+     * período, menos o desconto. Não existe quantidade de parcelas fixa;
+     * aqui é gerada só a primeira data de vencimento.
+     *
+     * Juros composto: mantido apenas por compatibilidade com empréstimos e
+     * backups já existentes — não é mais oferecido no formulário de cadastro.
      */
     fun calcular(
         valorEmprestadoCents: Cents,
         taxaPercentual: Double,
         tipo: TipoJuros,
         quantidadeParcelas: Int,
+        descontoPorParcelaCents: Cents,
         dataEmprestimo: LocalDate,
         primeiroVencimento: LocalDate,
         frequencia: FrequenciaParcela
     ): ResumoEmprestimo {
-        val totalAReceberCents: Cents = when (tipo) {
-            TipoJuros.SIMPLES -> {
-                val juros = valorEmprestadoCents.applyPercentage(taxaPercentual)
-                valorEmprestadoCents + juros
-            }
-            TipoJuros.COMPOSTO -> {
+        if (tipo == TipoJuros.ALUGUEL) {
+            val jurosPeriodo = valorEmprestadoCents.applyPercentage(taxaPercentual)
+            val valorParcela = (jurosPeriodo - descontoPorParcelaCents).coerceAtLeast(0)
+            return ResumoEmprestimo(
+                valorEmprestadoCents = valorEmprestadoCents,
+                totalJurosCents = valorParcela,
+                totalAReceberCents = valorEmprestadoCents + valorParcela,
+                valorParcelaCents = valorParcela,
+                valoresParcelas = listOf(valorParcela),
+                datasParcelas = listOf(primeiroVencimento)
+            )
+        }
+
+        val totalSemDesconto: Cents = when (tipo) {
+            TipoJuros.SIMPLES -> valorEmprestadoCents + valorEmprestadoCents.applyPercentage(taxaPercentual)
+            else -> { // COMPOSTO — legado
                 var valor = BigDecimal(valorEmprestadoCents)
                 val rate = BigDecimal.ONE.add(BigDecimal.valueOf(taxaPercentual).movePointLeft(2))
                 repeat(quantidadeParcelas) { valor = valor.multiply(rate) }
                 valor.setScale(0, RoundingMode.HALF_UP).toLong()
             }
         }
+
+        val valoresBase = distribuirIgualmente(totalSemDesconto, quantidadeParcelas)
+        val valoresComDesconto = valoresBase.map { (it - descontoPorParcelaCents).coerceAtLeast(0) }
+        val totalAReceberCents = valoresComDesconto.sum()
         val totalJurosCents = totalAReceberCents - valorEmprestadoCents
-        val valorParcelaCents = distribuirIgualmente(totalAReceberCents, quantidadeParcelas).first()
         val datas = InstallmentGenerator.gerarDatas(primeiroVencimento, quantidadeParcelas, frequencia)
 
         return ResumoEmprestimo(
             valorEmprestadoCents = valorEmprestadoCents,
             totalJurosCents = totalJurosCents,
             totalAReceberCents = totalAReceberCents,
-            valorParcelaCents = valorParcelaCents,
+            valorParcelaCents = valoresComDesconto.first(),
+            valoresParcelas = valoresComDesconto,
             datasParcelas = datas
         )
     }
@@ -86,13 +107,19 @@ object InterestCalculator {
 
 object InstallmentGenerator {
     fun gerarDatas(primeiroVencimento: LocalDate, quantidade: Int, frequencia: FrequenciaParcela): List<LocalDate> {
-        return (0 until quantidade).map { index ->
-            when (frequencia) {
-                FrequenciaParcela.DIARIA -> primeiroVencimento.plusDays(index.toLong())
-                FrequenciaParcela.SEMANAL -> primeiroVencimento.plusWeeks(index.toLong())
-                FrequenciaParcela.QUINZENAL -> primeiroVencimento.plusDays(index.toLong() * 15)
-                FrequenciaParcela.MENSAL -> primeiroVencimento.plusMonths(index.toLong())
-            }
+        return (0 until quantidade).map { index -> avancar(primeiroVencimento, frequencia, index.toLong()) }
+    }
+
+    /** Próxima data de vencimento a partir de uma data base, conforme a frequência. */
+    fun proximaData(dataBase: LocalDate, frequencia: FrequenciaParcela): LocalDate =
+        avancar(dataBase, frequencia, 1L)
+
+    private fun avancar(data: LocalDate, frequencia: FrequenciaParcela, periodos: Long): LocalDate {
+        return when (frequencia) {
+            FrequenciaParcela.DIARIA -> data.plusDays(periodos)
+            FrequenciaParcela.SEMANAL -> data.plusWeeks(periodos)
+            FrequenciaParcela.QUINZENAL -> data.plusDays(periodos * 15)
+            FrequenciaParcela.MENSAL -> data.plusMonths(periodos)
         }
     }
 }
