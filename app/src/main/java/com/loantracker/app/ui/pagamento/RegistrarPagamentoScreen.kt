@@ -50,7 +50,7 @@ fun RegistrarPagamentoScreen(onVoltar: () -> Unit, onPagamentoRegistrado: () -> 
     val viewModel = rememberViewModel { repo -> RegistrarPagamentoViewModel(repo) }
     val clienteSelecionado by viewModel.clienteSelecionado.collectAsState()
     val clientesFiltrados by viewModel.clientesFiltrados.collectAsState()
-    val parcelasPendentes by viewModel.parcelasPendentes.collectAsState()
+    val gruposPendentes by viewModel.gruposPendentes.collectAsState()
 
     var busca by remember { mutableStateOf("") }
     var parcelaSelecionada by remember { mutableStateOf<Parcela?>(null) }
@@ -111,23 +111,33 @@ fun RegistrarPagamentoScreen(onVoltar: () -> Unit, onPagamentoRegistrado: () -> 
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    if (parcelasPendentes.isEmpty()) {
+                    if (gruposPendentes.isEmpty()) {
                         Text("Este cliente não possui parcelas pendentes.")
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(parcelasPendentes, key = { it.id }) { parcela ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().clickable {
-                                        parcelaSelecionada = parcela
-                                        valorTexto = (parcela.valorCents - parcela.valorPagoCents).toPlainDecimalString()
-                                        dataPagamento = LocalDate.now()
-                                    },
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Parcela ${parcela.numero}", fontWeight = FontWeight.Bold)
-                                        Text(parcela.vencimento.format(dateFormatter))
-                                        Text(parcela.restanteCents().toBRL())
+                            gruposPendentes.forEach { grupo ->
+                                item(key = "titulo_${grupo.emprestimoId}") {
+                                    Text(
+                                        grupo.titulo,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                                items(grupo.parcelas, key = { it.id }) { parcela ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth().clickable {
+                                            parcelaSelecionada = parcela
+                                            valorTexto = (parcela.valorCents - parcela.valorPagoCents).toPlainDecimalString()
+                                            dataPagamento = LocalDate.now()
+                                        },
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("Parcela ${parcela.numero}", fontWeight = FontWeight.Bold)
+                                            Text(parcela.vencimento.format(dateFormatter))
+                                            Text(parcela.restanteCents().toBRL())
+                                        }
                                     }
                                 }
                             }
