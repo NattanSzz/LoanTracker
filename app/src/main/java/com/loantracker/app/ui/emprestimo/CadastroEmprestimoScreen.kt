@@ -10,8 +10,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +22,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,8 +50,12 @@ private fun FrequenciaParcela.label() = when (this) {
 
 private fun TipoJuros.label() = when (this) {
     TipoJuros.SIMPLES -> "Juros simples"
-    TipoJuros.COMPOSTO -> "Juros compostos"
+    TipoJuros.ALUGUEL -> "Aluguel"
+    TipoJuros.COMPOSTO -> "Juros compostos" // legado, não selecionável no formulário
 }
+
+/** Só estas duas opções aparecem no formulário — COMPOSTO fica só para dados antigos. */
+private val opcoesTipoJuros = listOf(TipoJuros.SIMPLES, TipoJuros.ALUGUEL)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,14 +71,16 @@ fun CadastroEmprestimoScreen(
     var valorTexto by remember { mutableStateOf("") }
     var taxaTexto by remember { mutableStateOf("") }
     var parcelasTexto by remember { mutableStateOf("1") }
+    var descontoTexto by remember { mutableStateOf("0") }
 
-    androidx.compose.runtime.LaunchedEffect(clientePreSelecionadoId) {
+    LaunchedEffect(clientePreSelecionadoId) {
         if (clientePreSelecionadoId != null && form.clienteId == null) {
             viewModel.atualizar { it.copy(clienteId = clientePreSelecionadoId) }
         }
     }
 
     val clienteSelecionado = clientes.firstOrNull { it.id == form.clienteId }
+    val ehAluguel = form.tipoJuros == TipoJuros.ALUGUEL
 
     Scaffold(
         topBar = {
@@ -130,9 +137,22 @@ fun CadastroEmprestimoScreen(
                     singleLine = true
                 )
 
+                OutlinedTextField(
+                    value = descontoTexto,
+                    onValueChange = {
+                        descontoTexto = it
+                        viewModel.atualizar { form -> form.copy(descontoPorParcelaCents = parseToCents(it)) }
+                    },
+                    label = { Text("Desconto por parcela") },
+                    placeholder = { Text("R$ 0,00") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
                 Text("Tipo de juros", style = MaterialTheme.typography.bodyMedium)
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    TipoJuros.entries.forEachIndexed { index, tipo ->
+                    opcoesTipoJuros.forEach { tipo ->
                         SegmentedButton(
                             selected = form.tipoJuros == tipo,
                             onClick = { viewModel.atualizar { it.copy(tipoJuros = tipo) } },
@@ -142,19 +162,28 @@ fun CadastroEmprestimoScreen(
                         }
                     }
                 }
+                if (ehAluguel) {
+                    Text(
+                        "No aluguel, o cliente paga só os juros periodicamente, sem prazo fixo pra quitar. " +
+                            "Não há quantidade de parcelas — elas vão sendo geradas conforme a frequência.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
-                OutlinedTextField(
-                    value = parcelasTexto,
-                    onValueChange = {
-                        parcelasTexto = it
-                        viewModel.atualizar { form -> form.copy(quantidadeParcelas = it.toIntOrNull() ?: 1) }
-                    },
-                    label = { Text("Quantidade de parcelas") },
-                    placeholder = { Text("5") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                if (!ehAluguel) {
+                    OutlinedTextField(
+                        value = parcelasTexto,
+                        onValueChange = {
+                            parcelasTexto = it
+                            viewModel.atualizar { form -> form.copy(quantidadeParcelas = it.toIntOrNull() ?: 1) }
+                        },
+                        label = { Text("Quantidade de parcelas") },
+                        placeholder = { Text("5") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
 
                 SeletorDropdown(
                     label = "Frequência das parcelas",
@@ -196,15 +225,24 @@ fun CadastroEmprestimoScreen(
             ) {
                 LinhaResumo("Cliente", clienteSelecionado?.nome ?: "-")
                 LinhaResumo("Valor emprestado", form.valorEmprestadoCents.toBRL())
-                LinhaResumo("Juros", "${form.taxaPercentual}% por parcela")
+                LinhaResumo("Juros", "${form.taxaPercentual}%")
                 LinhaResumo("Tipo", form.tipoJuros.label())
-                LinhaResumo("Parcelas", form.quantidadeParcelas.toString())
+                if (!ehAluguel) {
+                    LinhaResumo("Parcelas", form.quantidadeParcelas.toString())
+                }
+                if (form.descontoPorParcelaCents > 0) {
+                    LinhaResumo("Desconto por parcela", "- ${form.descontoPorParcelaCents.toBRL()}")
+                }
                 LinhaResumo("Frequência", form.frequencia.label())
                 LinhaResumo("Data do empréstimo", form.dataEmprestimo.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
                 LinhaResumo("Primeiro vencimento", form.primeiroVencimento.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                LinhaResumo("Total a receber", resumo?.totalAReceberCents?.toBRL() ?: "-", destaque = true)
-                LinhaResumo("Valor de cada parcela", resumo?.valorParcelaCents?.toBRL() ?: "-", destaque = true)
+                if (ehAluguel) {
+                    LinhaResumo("Valor do aluguel (por período)", resumo?.valorParcelaCents?.toBRL() ?: "-", destaque = true)
+                } else {
+                    LinhaResumo("Total a receber", resumo?.totalAReceberCents?.toBRL() ?: "-", destaque = true)
+                    LinhaResumo("Valor de cada parcela", resumo?.valorParcelaCents?.toBRL() ?: "-", destaque = true)
+                }
 
                 Button(
                     onClick = { viewModel.confirmar(onEmprestimoCadastrado) },
