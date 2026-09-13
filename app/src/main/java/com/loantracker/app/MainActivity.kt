@@ -13,10 +13,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.loantracker.app.data.PasswordManager
 import com.loantracker.app.notificacoes.NotificacaoHelper
+import com.loantracker.app.ui.lock.LockScreen
 import com.loantracker.app.ui.navigation.DeepLinkTarget
 import com.loantracker.app.ui.navigation.LoanTrackerNavGraph
 import com.loantracker.app.ui.theme.LoanTrackerTheme
@@ -75,7 +79,14 @@ fun LoanTrackerRoot(
 ) {
     LoanTrackerTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
-            LoanTrackerNavGraph(deepLink = deepLink, onDeepLinkConsumido = onDeepLinkConsumido)
+            val context = LocalContext.current
+            var desbloqueado by remember { mutableStateOf(!PasswordManager.temSenha(context)) }
+
+            if (desbloqueado) {
+                LoanTrackerNavGraph(deepLink = deepLink, onDeepLinkConsumido = onDeepLinkConsumido)
+            } else {
+                LockScreen(onDesbloqueado = { desbloqueado = true })
+            }
         }
     }
 }
