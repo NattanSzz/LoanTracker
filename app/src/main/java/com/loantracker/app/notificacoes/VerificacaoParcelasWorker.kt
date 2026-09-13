@@ -4,11 +4,14 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.loantracker.app.LoanTrackerApp
+import com.loantracker.app.data.BackupManager
 
 /**
- * Verificação diária das parcelas: busca no banco local quais vencem amanhã,
- * quais vencem hoje e quais estão vencidas, e posta as notificações
- * correspondentes. Não depende de internet, servidor ou Firebase.
+ * Verificação diária: processa empréstimos do tipo Aluguel (auto-pagamento e
+ * geração da próxima parcela), faz o backup automático (se uma pasta de
+ * destino já foi escolhida) e por fim posta as notificações de parcelas
+ * vencendo amanhã, hoje ou vencidas. Não depende de internet, servidor ou
+ * Firebase.
  */
 class VerificacaoParcelasWorker(
     context: Context,
@@ -17,7 +20,12 @@ class VerificacaoParcelasWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val repository = (applicationContext as LoanTrackerApp).repository
+            val app = applicationContext as LoanTrackerApp
+            val repository = app.repository
+
+            repository.processarEmprestimosAluguel()
+            BackupManager.executarBackupAutomaticoSeConfigurado(applicationContext, repository)
+
             val dados = repository.buscarDadosParaNotificacao()
             NotificacaoHelper.notificarTudo(applicationContext, dados)
             Result.success()
