@@ -28,6 +28,8 @@ import com.loantracker.app.ui.home.HomeScreen
 import com.loantracker.app.ui.info.InfoScreen
 import com.loantracker.app.ui.pagamento.RegistrarPagamentoScreen
 import com.loantracker.app.ui.perfil.PerfilClienteScreen
+import com.loantracker.app.ui.settings.DefinirSenhaScreen
+import com.loantracker.app.ui.settings.SettingsScreen
 
 object Routes {
     const val HOME = "home"
@@ -37,6 +39,8 @@ object Routes {
     const val REGISTRAR_PAGAMENTO = "registrar_pagamento"
     const val PERFIL_CLIENTE = "perfil_cliente/{clienteId}"
     const val DETALHE_EMPRESTIMO = "detalhe_emprestimo/{emprestimoId}"
+    const val CONFIGURACOES = "configuracoes"
+    const val DEFINIR_SENHA = "definir_senha"
 
     fun perfilCliente(id: Long) = "perfil_cliente/$id"
     fun detalheEmprestimo(id: Long) = "detalhe_emprestimo/$id"
@@ -112,7 +116,8 @@ fun LoanTrackerNavGraph(
                     onCadastrarCliente = { navController.navigate(Routes.CADASTRO_CLIENTE) },
                     onCadastrarEmprestimo = { navController.navigate(Routes.cadastroEmprestimo()) },
                     onRegistrarPagamento = { navController.navigate(Routes.REGISTRAR_PAGAMENTO) },
-                    onAbrirCliente = { id -> navController.navigate(Routes.perfilCliente(id)) }
+                    onAbrirCliente = { id -> navController.navigate(Routes.perfilCliente(id)) },
+                    onAbrirConfiguracoes = { navController.navigate(Routes.CONFIGURACOES) }
                 )
             }
             composable(Routes.INFO) {
@@ -167,6 +172,18 @@ fun LoanTrackerNavGraph(
                 DetalheEmprestimoScreen(
                     emprestimoId = emprestimoId,
                     onVoltar = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.CONFIGURACOES) {
+                SettingsScreen(
+                    onVoltar = { navController.popBackStack() },
+                    onIrParaDefinirSenha = { navController.navigate(Routes.DEFINIR_SENHA) }
+                )
+            }
+            composable(Routes.DEFINIR_SENHA) {
+                DefinirSenhaScreen(
+                    onVoltar = { navController.popBackStack() },
+                    onSenhaSalva = { navController.popBackStack() }
                 )
             }
         }
