@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.loantracker.app.data.NotificationPrefs
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
@@ -12,12 +13,21 @@ object NotificationScheduler {
 
     private const val NOME_TRABALHO = "verificacao_parcelas_diaria"
 
-    /** Horário-alvo da verificação diária: manhã, nunca de madrugada. */
-    private const val HORA_EXECUCAO = 9
-
+    /** Chamado na abertura do app — não reinicia a contagem se já houver um agendamento. */
     fun agendarVerificacaoDiaria(context: Context) {
+        agendar(context, ExistingPeriodicWorkPolicy.KEEP)
+    }
+
+    /** Chamado quando o usuário muda o horário nas Configurações — força o reagendamento. */
+    fun reagendarComNovoHorario(context: Context) {
+        agendar(context, ExistingPeriodicWorkPolicy.UPDATE)
+    }
+
+    private fun agendar(context: Context, politica: ExistingPeriodicWorkPolicy) {
+        val (horaConfigurada, minutoConfigurado) = NotificationPrefs.obterHorario(context)
+
         val agora = LocalDateTime.now()
-        var proximaExecucao = agora.withHour(HORA_EXECUCAO).withMinute(0).withSecond(0).withNano(0)
+        var proximaExecucao = agora.withHour(horaConfigurada).withMinute(minutoConfigurado).withSecond(0).withNano(0)
         if (!proximaExecucao.isAfter(agora)) {
             proximaExecucao = proximaExecucao.plusDays(1)
         }
@@ -27,12 +37,6 @@ object NotificationScheduler {
             .setInitialDelay(atraso.toMinutes(), TimeUnit.MINUTES)
             .build()
 
-        // KEEP: se já existir um agendamento, não reinicia a contagem a cada
-        // vez que o app é aberto — só agenda de verdade na primeira vez.
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            NOME_TRABALHO,
-            ExistingPeriodicWorkPolicy.KEEP,
-            pedido
-        )
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(NOME_TRABALHO, politica, pedido)
     }
 }
