@@ -26,11 +26,14 @@ data class ResumoEmprestimo(
 object InterestCalculator {
 
     /**
-     * A taxa informada (ex: 10% "ao mês") é aplicada uma vez por parcela, já que
-     * cada parcela representa um período do empréstimo.
+     * Juros simples (a pedido do usuário — juros incide uma única vez sobre o
+     * principal, não por parcela):
+     *   totalJuros = principal * taxa
+     *   totalAReceber = principal + totalJuros
+     *   valorParcela = totalAReceber / quantidadeParcelas
+     * Ex.: R$ 1.000,00 a 20% em 4 parcelas → (1000 + 200) / 4 = R$ 300,00.
      *
-     * Juros simples:  totalJuros = principal * taxa * quantidadeParcelas
-     * Juros composto:  totalAReceber = principal * (1 + taxa)^quantidadeParcelas
+     * Juros composto (inalterado): totalAReceber = principal * (1 + taxa)^quantidadeParcelas
      */
     fun calcular(
         valorEmprestadoCents: Cents,
@@ -43,7 +46,7 @@ object InterestCalculator {
     ): ResumoEmprestimo {
         val totalAReceberCents: Cents = when (tipo) {
             TipoJuros.SIMPLES -> {
-                val juros = valorEmprestadoCents.applyPercentage(taxaPercentual) * quantidadeParcelas
+                val juros = valorEmprestadoCents.applyPercentage(taxaPercentual)
                 valorEmprestadoCents + juros
             }
             TipoJuros.COMPOSTO -> {
