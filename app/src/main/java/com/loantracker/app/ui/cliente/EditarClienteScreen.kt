@@ -30,6 +30,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loantracker.app.data.Cliente
 import com.loantracker.app.data.LoanRepository
+import com.loantracker.app.data.PhoneUtils
+import com.loantracker.app.ui.components.CampoTelefone
 import com.loantracker.app.ui.rememberViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +49,7 @@ class EditarClienteViewModel(
     fun salvar(
         clienteAtual: Cliente,
         nome: String,
-        telefone: String,
+        telefoneDigitos: String,
         cpf: String,
         endereco: String,
         observacao: String,
@@ -57,7 +59,7 @@ class EditarClienteViewModel(
             repository.atualizarCliente(
                 clienteAtual.copy(
                     nome = nome.trim(),
-                    telefone = telefone.trim().ifBlank { null },
+                    telefone = telefoneDigitos.ifBlank { null }?.let { PhoneUtils.paraArmazenamento(it) },
                     cpf = cpf.trim().ifBlank { null },
                     endereco = endereco.trim().ifBlank { null },
                     observacao = observacao.trim().ifBlank { null }
@@ -79,7 +81,7 @@ fun EditarClienteScreen(
     val cliente by viewModel.cliente.collectAsState()
 
     var nome by remember { mutableStateOf("") }
-    var telefone by remember { mutableStateOf("") }
+    var telefoneDigitos by remember { mutableStateOf("") }
     var cpf by remember { mutableStateOf("") }
     var endereco by remember { mutableStateOf("") }
     var observacao by remember { mutableStateOf("") }
@@ -89,7 +91,7 @@ fun EditarClienteScreen(
         val atual = cliente
         if (atual != null && !dadosCarregados) {
             nome = atual.nome
-            telefone = atual.telefone ?: ""
+            telefoneDigitos = PhoneUtils.paraEdicao(atual.telefone)
             cpf = atual.cpf ?: ""
             endereco = atual.endereco ?: ""
             observacao = atual.observacao ?: ""
@@ -124,12 +126,9 @@ fun EditarClienteScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-            OutlinedTextField(
-                value = telefone,
-                onValueChange = { telefone = it },
-                label = { Text("Telefone") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+            CampoTelefone(
+                digitos = telefoneDigitos,
+                onDigitosChange = { telefoneDigitos = it }
             )
             OutlinedTextField(
                 value = cpf,
@@ -154,7 +153,7 @@ fun EditarClienteScreen(
             Button(
                 onClick = {
                     cliente?.let { atual ->
-                        viewModel.salvar(atual, nome, telefone, cpf, endereco, observacao, onClienteSalvo)
+                        viewModel.salvar(atual, nome, telefoneDigitos, cpf, endereco, observacao, onClienteSalvo)
                     }
                 },
                 enabled = nome.isNotBlank() && cliente != null,

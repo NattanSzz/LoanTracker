@@ -28,13 +28,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.loantracker.app.data.Cliente
 import com.loantracker.app.data.LoanRepository
+import com.loantracker.app.data.PhoneUtils
+import com.loantracker.app.ui.components.CampoTelefone
 import com.loantracker.app.ui.rememberViewModel
 import kotlinx.coroutines.launch
 
 class CadastroClienteViewModel(private val repository: LoanRepository) : ViewModel() {
     fun cadastrar(
         nome: String,
-        telefone: String,
+        telefoneDigitos: String,
         cpf: String,
         endereco: String,
         observacao: String,
@@ -44,7 +46,7 @@ class CadastroClienteViewModel(private val repository: LoanRepository) : ViewMod
             val id = repository.cadastrarCliente(
                 Cliente(
                     nome = nome.trim(),
-                    telefone = telefone.trim().ifBlank { null },
+                    telefone = telefoneDigitos.ifBlank { null }?.let { PhoneUtils.paraArmazenamento(it) },
                     cpf = cpf.trim().ifBlank { null },
                     endereco = endereco.trim().ifBlank { null },
                     observacao = observacao.trim().ifBlank { null }
@@ -64,7 +66,7 @@ fun CadastroClienteScreen(
     val viewModel = rememberViewModel { repo -> CadastroClienteViewModel(repo) }
 
     var nome by remember { mutableStateOf("") }
-    var telefone by remember { mutableStateOf("") }
+    var telefoneDigitos by remember { mutableStateOf("") }
     var cpf by remember { mutableStateOf("") }
     var endereco by remember { mutableStateOf("") }
     var observacao by remember { mutableStateOf("") }
@@ -96,12 +98,9 @@ fun CadastroClienteScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-            OutlinedTextField(
-                value = telefone,
-                onValueChange = { telefone = it },
-                label = { Text("Telefone") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+            CampoTelefone(
+                digitos = telefoneDigitos,
+                onDigitosChange = { telefoneDigitos = it }
             )
             OutlinedTextField(
                 value = cpf,
@@ -125,7 +124,7 @@ fun CadastroClienteScreen(
             )
             Button(
                 onClick = {
-                    viewModel.cadastrar(nome, telefone, cpf, endereco, observacao) { id ->
+                    viewModel.cadastrar(nome, telefoneDigitos, cpf, endereco, observacao) { id ->
                         onClienteCadastrado(id)
                     }
                 },
