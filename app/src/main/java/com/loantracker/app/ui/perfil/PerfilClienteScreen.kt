@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.loantracker.app.data.PhoneUtils
 import com.loantracker.app.data.TipoJuros
 import com.loantracker.app.data.toBRL
 import com.loantracker.app.ui.rememberViewModel
@@ -75,7 +76,7 @@ fun PerfilClienteScreen(
             item {
                 Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        cliente?.telefone?.let { Text("Telefone: $it") }
+                        PhoneUtils.paraExibicao(cliente?.telefone)?.let { Text("Telefone: $it") }
                         cliente?.cpf?.let { Text("CPF: $it") }
                         cliente?.endereco?.let { Text("Endereço: $it") }
                         cliente?.observacao?.let { Text("Obs: $it") }
