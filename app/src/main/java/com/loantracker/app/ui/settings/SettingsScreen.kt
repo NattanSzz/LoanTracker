@@ -8,12 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -21,7 +17,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.loantracker.app.data.NotificationPrefs
@@ -40,13 +36,12 @@ import com.loantracker.app.notificacoes.NotificationScheduler
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onVoltar: () -> Unit,
     onIrParaDefinirSenha: () -> Unit
 ) {
     val context = LocalContext.current
     // Recalculado sempre que esta tela é composta — o NavHost recompõe este
-    // destino do zero ao voltar para ele, então isto reflete corretamente
-    // uma senha recém-criada ou alterada.
+    // destino do zero ao voltar pra ela, então isto reflete corretamente uma
+    // senha recém-criada ou alterada.
     val temSenha = remember { PasswordManager.temSenha(context) }
 
     var horarioAtual by remember { mutableStateOf(NotificationPrefs.obterHorario(context)) }
@@ -66,31 +61,22 @@ fun SettingsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Configurações") },
-                navigationIcon = {
-                    IconButton(onClick = onVoltar) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    Scaffold { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
+            Text("Configurações", style = MaterialTheme.typography.headlineSmall)
+
             Button(onClick = onIrParaDefinirSenha, modifier = Modifier.fillMaxWidth()) {
                 Text(if (temSenha) "Alterar senha" else "Adicionar senha")
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Horário das notificações", style = MaterialTheme.typography.titleSmall)
+                Text("Horário das notificações", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
                     "As verificações diárias (avisos de vencimento e backup automático) acontecem nesse horário.",
                     style = MaterialTheme.typography.bodySmall
