@@ -2,12 +2,14 @@ package com.loantracker.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.loantracker.app.data.Cents
 import com.loantracker.app.data.ClienteResumo
 import com.loantracker.app.data.LoanRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 class HomeViewModel(repository: LoanRepository) : ViewModel() {
@@ -23,4 +25,10 @@ class HomeViewModel(repository: LoanRepository) : ViewModel() {
             if (filtro.isBlank()) resumos
             else resumos.filter { it.cliente.nome.contains(filtro, ignoreCase = true) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Soma do que vence hoje — o destaque da tela inicial. */
+    val valorPendenteHojeCents: StateFlow<Cents> =
+        repository.observarInfoGeral()
+            .map { it.venceHojeValorCents }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 }
